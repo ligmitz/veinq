@@ -1,0 +1,13 @@
+[package]
+name = "veinq-client"
+version = "0.1.0"
+edition = "2021"
+description = "Rust client library for the Veinq message server"
+license = "AGPL-3.0"
+repository = "https://github.com/ligmitz/veinq"
+readme = "../README.md"
+keywords = ["rust", "messaging", "broker", "streaming"]
+categories = ["network-programming", "asynchronous"]
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }

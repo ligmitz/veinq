@@ -1,3 +1,18 @@
+// Copyright (C) 2026 Gaurav Pandey
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published
+// by the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 use crate::storage::Broker;
 use std::str;
 use std::sync::{Arc, Mutex};
@@ -5,11 +20,11 @@ use std::vec;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 
-pub async fn run(broker: Arc<Mutex<Broker>>) {
-    let listener = TcpListener::bind("127.0.0.1:9092")
+pub async fn run(broker: Arc<Mutex<Broker>>, addr: String) {
+    let listener = TcpListener::bind(&addr)
         .await
         .expect("Failed to bind to address");
-    println!("Stratum running on 127.0.0.1:9092");
+    println!("Veinq running on {}", addr);
     loop {
         let (socket, addr) = listener
             .accept()
@@ -41,6 +56,7 @@ async fn handle_client(mut socket: tokio::net::TcpStream, broker: Arc<Mutex<Brok
         let response = match request_type {
             0 => handle_produce(payload, &broker),
             1 => handle_consume(payload, &broker),
+            2 => handle_create_topic(payload, &broker),
             _ => {
                 println!("Unknown request type: {}", request_type);
                 b"Unknown request type".to_vec()
@@ -129,5 +145,40 @@ fn handle_consume(payload: &[u8], broker: &Arc<Mutex<Broker>>) -> Vec<u8> {
             data
         }
         Err(e) => format!("Error: {}", e).into_bytes(),
+    }
+}
+
+fn handle_create_topic(payload: &[u8], broker: &Arc<Mutex<Broker>>) -> Vec<u8> {
+    let null_pos = match payload.iter().position(|&b| b == 0) {
+        Some(pos) => pos,
+        None => return vec![0x02],
+    };
+    let topic = match str::from_utf8(&payload[..null_pos]) {
+        Ok(s) => s,
+        Err(_) => return vec![0x02],
+    };
+    let rest = &payload[null_pos + 1..];
+    if rest.len() < 4 {
+        return vec![0x02];
+    }
+    let num_partitions: u32 = u32::from_be_bytes(rest[..4].try_into().unwrap());
+    let mut broker = broker.lock().unwrap();
+    match broker.create_topic(topic, num_partitions) {
+        Ok(_) => {
+            println!(
+                "Created topic '{}' with '{}' partitions",
+                topic, num_partitions
+            );
+            vec![0x00]
+        }
+        Err(e) => {
+            if e.kind() == std::io::ErrorKind::AlreadyExists {
+                println!("Topic '{}' already exists", topic);
+                vec![0x01]
+            } else {
+                println!("Error creating topic '{}': {}", topic, e);
+                vec![0x02]
+            }
+        }
     }
 }

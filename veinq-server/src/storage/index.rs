@@ -1,3 +1,18 @@
+// Copyright (C) 2026 Gaurav Pandey
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published
+// by the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 use std::fs::{File, OpenOptions};
 use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::path::Path;
@@ -9,8 +24,9 @@ pub struct Index {
 }
 
 impl Index {
-    pub fn new(dir: &Path) -> io::Result<Self> {
-        let index_path = dir.join("stratum.index");
+    pub fn new(dir: &Path, base_offset: u64) -> io::Result<Self> {
+        let filename = format!("{:020}.index", base_offset);
+        let index_path = dir.join(&filename);
         let file = OpenOptions::new()
             .read(true)
             .append(true)
